@@ -1,0 +1,81 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: Inter, sans-serif;
+  --font-sans--font-feature-settings: 'cv11';
+}
+
+/* Scrollbar Styles */
+@layer base {
+  /* Basic scrollbar styles */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(155, 155, 155, 0.5) transparent;
+  }
+
+  /* Chrome, Edge, Safari */
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 5px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: rgba(155, 155, 155, 0.5);
+    border-radius: 5px;
+    border: 2px solid transparent;
+  }
+
+  /* Explicitly target horizontal scrollbars */
+  *::-webkit-scrollbar:horizontal {
+    height: 10px !important;
+  }
+
+  *::-webkit-scrollbar-thumb:horizontal {
+    background-color: rgba(155, 155, 155, 0.7) !important;
+    min-width: 50px;
+    border-radius: 5px;
+    border: 2px solid transparent;
+  }
+
+  /* Dark mode adjustments */
+  @media (prefers-color-scheme: dark) {
+    * {
+      scrollbar-color: rgba(200, 200, 200, 0.5) transparent;
+    }
+
+    *::-webkit-scrollbar-thumb {
+      background-color: rgba(200, 200, 200, 0.5);
+    }
+
+    *::-webkit-scrollbar-thumb:horizontal {
+      background-color: rgba(200, 200, 200, 0.7) !important;
+    }
+  }
+
+  /* Hover effects */
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(155, 155, 155, 0.8);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    *::-webkit-scrollbar-thumb:hover {
+      background-color: rgba(200, 200, 200, 0.8);
+    }
+  }
+}
+
+/* Adjust scrollbars for mobile devices */
+@media (max-width: 640px) {
+  *::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  *::-webkit-scrollbar:horizontal {
+    height: 6px !important;
+  }
+}

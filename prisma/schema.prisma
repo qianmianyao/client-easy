@@ -1,0 +1,67 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// 客户表
+model Customer {
+  id                Int                 @id @default(autoincrement())
+  customerName      String
+  phoneNumber       String?             @unique
+  affiliation       String?
+  customerStatus    String?
+  transactionStatus String?
+  notes             String?
+  submitTime        BigInt
+  submitUser        String?
+  transactions      TransactionDetail[]
+  @@unique([customerName, phoneNumber])
+  @@index([phoneNumber])
+  @@index([submitTime])
+  @@index([submitUser])
+  @@index([transactionStatus])
+  @@map("customers")
+}
+// 成交明细表
+model TransactionDetail {
+  id              Int      @id @default(autoincrement())
+  customerId      Int
+  productName     String
+  quantity        Int
+  unitPrice       Float
+  totalAmount     Float
+  transactionTime BigInt
+  customer        Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  @@index([customerId])
+  @@index([transactionTime])
+  @@index([productName])
+  @@map("transaction_details")
+}
+// 用户表
+model User {
+  id        Int    @id @default(autoincrement())
+  email     String @unique
+  username  String @unique
+  password  String
+  role      Role
+  createdAt BigInt
+  lastLogin BigInt?
+  @@index([role])
+  @@map("users")
+}
+enum Role {
+  admin
+  manager
+  staff
+  guest
+}
