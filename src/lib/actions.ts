@@ -781,6 +781,230 @@ export async function getCustomerAffiliations() {
 }
 
 /**
+ * 获取用户业绩统计分析数据
+ * @returns 用户业绩统计数据
+ */
+export async function getUsersAnalysisData() {
+  try {
+    // 获取当前登录用户信息
+    const session = await getServerSession(authOptions)
+    const userRole = session?.user?.role || 'guest'
+
+    // 检查权限：只有管理员和经理可以查看所有用户分析数据
+    if (userRole !== 'admin' && userRole !== 'manager') {
+      throw new Error('无权限访问，仅限管理员和经理操作')
+    }
+
+    // 获取所有用户
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        lastLogin: true,
+      },
+      orderBy: {
+        username: 'asc',
+      },
+    })
+
+    // 获取所有客户数据
+    const customers = await prisma.customer.findMany({
+      include: {
+        transactions: true,
+      },
+    })
+
+    // 获取所有交易明细
+    const transactions = await prisma.transactionDetail.findMany()
+
+    // 计算时间范围
+    const now = new Date()
+
+    // 设置时间为当天的23:59:59以确保包含今天所有数据
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime()
+
+    // 计算7天前的日期（从当天的00:00:00开始，前6天+今天=7天）
+    const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 0, 0, 0, 0).getTime()
+
+    // 计算30天前的日期（从当天的00:00:00开始，前29天+今天=30天）
+    const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29, 0, 0, 0, 0).getTime()
+
+    // 调试日志
+    console.log('Time ranges for data analysis:')
+    console.log('Today end (milliseconds):', todayEnd)
+    console.log('7 days ago (milliseconds):', sevenDaysAgo)
+    console.log('30 days ago (milliseconds):', thirtyDaysAgo)
+
+    // 创建测试时间戳
+    const testRecentTimestamp = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 3, 0, 0, 0, 0).getTime()
+    console.log('Test recent timestamp (3 days ago):', testRecentTimestamp)
+    console.log(
+      'Is test timestamp within 7 days?',
+      testRecentTimestamp >= sevenDaysAgo && testRecentTimestamp <= todayEnd
+    )
+
+    // 分析用户数据
+    const usersAnalysis = users.map((user) => {
+      // 获取用户提交的所有客户
+      const userCustomers = customers.filter((customer) => customer.submitUser === user.username)
+
+      // 获取客户数量
+      const totalCustomers = userCustomers.length
+
+      // 客户状态统计
+      const customerStatusCounts = {
+        进群: userCustomers.filter((c) => c.customerStatus === '进群').length,
+        已退群: userCustomers.filter((c) => c.customerStatus === '已退群').length,
+        已圈上: userCustomers.filter((c) => c.customerStatus === '已圈上').length,
+        被拉黑: userCustomers.filter((c) => c.customerStatus === '被拉黑').length,
+        封号失联: userCustomers.filter((c) => c.customerStatus === '封号失联').length,
+        重复: userCustomers.filter((c) => c.customerStatus === '重复').length,
+        返回: userCustomers.filter((c) => c.customerStatus === '返回').length,
+      }
+
+      // 成交情况统计
+      const transactionStatusCounts = {
+        已成交: userCustomers.filter((c) => c.transactionStatus === '已成交').length,
+        未成交: userCustomers.filter((c) => c.transactionStatus === '未成交').length,
+        待跟进: userCustomers.filter((c) => c.transactionStatus === '待跟进').length,
+      }
+
+      // 该用户客户的所有交易
+      const userTransactions = transactions.filter((t) => userCustomers.some((c) => c.id === t.customerId))
+
+      // 计算成交总额
+      const totalTransactionAmount = userTransactions.reduce((sum, t) => sum + t.totalAmount, 0)
+
+      // 计算平均每客户价值
+      const avgCustomerValue = totalCustomers > 0 ? totalTransactionAmount / totalCustomers : 0
+
+      // 计算转化率（已成交客户占比）
+      const conversionRate = totalCustomers > 0 ? (transactionStatusCounts.已成交 / totalCustomers) * 100 : 0
+
+      // 日期筛选辅助函数（处理BigInt类型的时间戳）
+      const isWithinTimeRange = (timestamp: bigint | number, startTime: number, endTime: number) => {
+        // 确保时间戳是数字类型
+        const timeValue = typeof timestamp === 'bigint' ? Number(timestamp) : Number(timestamp)
+        return timeValue >= startTime && timeValue <= endTime
+      }
+
+      // 按周期分析 - 近7天（包含本日）
+      const recentCustomers = userCustomers.filter((c) => isWithinTimeRange(c.submitTime, sevenDaysAgo, todayEnd))
+
+      const recentTransactions = userTransactions.filter((t) =>
+        isWithinTimeRange(t.transactionTime, sevenDaysAgo, todayEnd)
+      )
+
+      const recentRevenue = recentTransactions.reduce((sum, t) => sum + t.totalAmount, 0)
+
+      // 按周期分析 - 近30天（包含本日）
+      const monthlyCustomers = userCustomers.filter((c) => isWithinTimeRange(c.submitTime, thirtyDaysAgo, todayEnd))
+
+      const monthlyTransactions = userTransactions.filter((t) =>
+        isWithinTimeRange(t.transactionTime, thirtyDaysAgo, todayEnd)
+      )
+
+      const monthlyRevenue = monthlyTransactions.reduce((sum, t) => sum + t.totalAmount, 0)
+
+      // 记录诊断信息
+      if (user.id === 1) {
+        console.log(`Diagnostic info for user: ${user.username}`)
+        console.log(`Total customers: ${totalCustomers}`)
+
+        // 打印前3个客户的提交时间，用于调试
+        userCustomers.slice(0, 3).forEach((customer, index) => {
+          console.log(`Customer ${index + 1} submit time:`, customer.submitTime)
+          console.log(`  As number:`, Number(customer.submitTime))
+          console.log(`  As Date:`, new Date(Number(customer.submitTime)).toISOString())
+          console.log(`  Is within 7 days?`, isWithinTimeRange(customer.submitTime, sevenDaysAgo, todayEnd))
+          console.log(`  Is within 30 days?`, isWithinTimeRange(customer.submitTime, thirtyDaysAgo, todayEnd))
+        })
+
+        console.log(`Recent customers (7 days): ${recentCustomers.length}`)
+        console.log(`Monthly customers (30 days): ${monthlyCustomers.length}`)
+      }
+
+      // 计算百分比
+      const calculatePercentage = (value: number, total: number) => {
+        if (total === 0) return 0
+        return parseFloat(((value / total) * 100).toFixed(2))
+      }
+
+      // 返回分析数据
+      return {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        lastLoginTime: user.lastLogin,
+        customers: {
+          total: totalCustomers,
+          进群: {
+            count: customerStatusCounts.进群,
+            percentage: calculatePercentage(customerStatusCounts.进群, totalCustomers),
+          },
+          已退群: {
+            count: customerStatusCounts.已退群,
+            percentage: calculatePercentage(customerStatusCounts.已退群, totalCustomers),
+          },
+          已圈上: {
+            count: customerStatusCounts.已圈上,
+            percentage: calculatePercentage(customerStatusCounts.已圈上, totalCustomers),
+          },
+          被拉黑: {
+            count: customerStatusCounts.被拉黑,
+            percentage: calculatePercentage(customerStatusCounts.被拉黑, totalCustomers),
+          },
+          封号失联: {
+            count: customerStatusCounts.封号失联,
+            percentage: calculatePercentage(customerStatusCounts.封号失联, totalCustomers),
+          },
+          重复: {
+            count: customerStatusCounts.重复,
+            percentage: calculatePercentage(customerStatusCounts.重复, totalCustomers),
+          },
+          返回: {
+            count: customerStatusCounts.返回,
+            percentage: calculatePercentage(customerStatusCounts.返回, totalCustomers),
+          },
+        },
+        transactions: {
+          已成交: {
+            count: transactionStatusCounts.已成交,
+            percentage: calculatePercentage(transactionStatusCounts.已成交, totalCustomers),
+          },
+          未成交: {
+            count: transactionStatusCounts.未成交,
+            percentage: calculatePercentage(transactionStatusCounts.未成交, totalCustomers),
+          },
+          待跟进: {
+            count: transactionStatusCounts.待跟进,
+            percentage: calculatePercentage(transactionStatusCounts.待跟进, totalCustomers),
+          },
+          totalAmount: totalTransactionAmount,
+        },
+        performance: {
+          avgCustomerValue,
+          conversionRate,
+          recentCustomers: recentCustomers.length,
+          recentRevenue,
+          monthlyCustomers: monthlyCustomers.length,
+          monthlyRevenue,
+        },
+      }
+    })
+
+    return usersAnalysis
+  } catch (error) {
+    console.error('获取用户分析数据失败:', error)
+    throw new Error('获取用户分析数据失败: ' + (error instanceof Error ? error.message : String(error)))
+  }
+}
+
+/**
  * 更新客户的归属
  * @param formData 表单数据
  * @returns 更新后的客户信息
@@ -1067,5 +1291,94 @@ export async function getCustomerStatsByAffiliation() {
   } catch (error) {
     console.error('获取客户归属统计数据失败:', error)
     throw new Error('获取客户归属统计数据失败: ' + (error instanceof Error ? error.message : String(error)))
+  }
+}
+
+/**
+ * 检查系统中是否存在有效的测试数据（特别是近期的数据）
+ * @returns 检查结果和消息
+ */
+export async function checkForRecentTestData() {
+  try {
+    // 获取当前登录用户信息
+    const session = await getServerSession(authOptions)
+    const userRole = session?.user?.role || 'guest'
+
+    // 检查权限：只有管理员和经理可以执行此操作
+    if (userRole !== 'admin' && userRole !== 'manager') {
+      throw new Error('无权限访问，仅限管理员和经理操作')
+    }
+
+    // 计算时间范围
+    const now = new Date()
+
+    // 计算7天前的日期（从当天的00:00:00开始，前6天+今天=7天）
+    const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 0, 0, 0, 0).getTime()
+
+    // 计算30天前的日期（从当天的00:00:00开始，前29天+今天=30天）
+    const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29, 0, 0, 0, 0).getTime()
+
+    // 检查是否有最近7天的客户数据
+    const recentCustomersCount = await prisma.customer.count({
+      where: {
+        submitTime: {
+          gte: BigInt(sevenDaysAgo),
+          lte: BigInt(Date.now()),
+        },
+      },
+    })
+
+    // 检查是否有最近30天的客户数据
+    const monthlyCustomersCount = await prisma.customer.count({
+      where: {
+        submitTime: {
+          gte: BigInt(thirtyDaysAgo),
+          lte: BigInt(Date.now()),
+        },
+      },
+    })
+
+    // 检查是否有最近7天的交易数据
+    const recentTransactionsCount = await prisma.transactionDetail.count({
+      where: {
+        transactionTime: {
+          gte: BigInt(sevenDaysAgo),
+          lte: BigInt(Date.now()),
+        },
+      },
+    })
+
+    // 检查是否有最近30天的交易数据
+    const monthlyTransactionsCount = await prisma.transactionDetail.count({
+      where: {
+        transactionTime: {
+          gte: BigInt(thirtyDaysAgo),
+          lte: BigInt(Date.now()),
+        },
+      },
+    })
+
+    // 返回结果
+    return {
+      hasRecentCustomers: recentCustomersCount > 0,
+      recentCustomersCount,
+      hasMonthlyCustomers: monthlyCustomersCount > 0,
+      monthlyCustomersCount,
+      hasRecentTransactions: recentTransactionsCount > 0,
+      recentTransactionsCount,
+      hasMonthlyTransactions: monthlyTransactionsCount > 0,
+      monthlyTransactionsCount,
+      timestampExplanation: {
+        currentTimestamp: Date.now(),
+        sevenDaysAgo,
+        thirtyDaysAgo,
+        currentDate: new Date().toISOString(),
+        sevenDaysAgoDate: new Date(sevenDaysAgo).toISOString(),
+        thirtyDaysAgoDate: new Date(thirtyDaysAgo).toISOString(),
+      },
+    }
+  } catch (error) {
+    console.error('检查最近数据失败:', error)
+    throw new Error('检查最近数据失败: ' + (error instanceof Error ? error.message : String(error)))
   }
 }

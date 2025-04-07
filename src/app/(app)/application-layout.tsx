@@ -33,6 +33,7 @@ import {
   DocumentChartBarIcon,
   HomeIcon,
   QuestionMarkCircleIcon,
+  ShieldCheckIcon,
   SparklesIcon,
   UserGroupIcon,
 } from '@heroicons/react/20/solid'
@@ -130,8 +131,14 @@ export function ApplicationLayout({ children }: { children: React.ReactNode }) {
               </SidebarItem>
               {(role === 'admin' || role === 'manager') && (
                 <SidebarItem href="/admin" current={pathname.startsWith('/admin')}>
-                  <UserGroupIcon />
+                  <ShieldCheckIcon />
                   <SidebarLabel>管理员</SidebarLabel>
+                </SidebarItem>
+              )}
+              {(role === 'admin' || role === 'manager') && (
+                <SidebarItem href="/users-analysis" current={pathname.startsWith('/users-analysis')}>
+                  <UserGroupIcon />
+                  <SidebarLabel>员工数据分析</SidebarLabel>
                 </SidebarItem>
               )}
             </SidebarSection>
