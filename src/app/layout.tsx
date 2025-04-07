@@ -1,5 +1,6 @@
 import '@/styles/tailwind.css'
 import type { Metadata } from 'next'
+import { Toaster } from 'react-hot-toast'
 import { Providers } from './providers'
 
 export const metadata: Metadata = {
@@ -22,6 +23,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body>
         <Providers>{children}</Providers>
+        <Toaster />
       </body>
     </html>
   )

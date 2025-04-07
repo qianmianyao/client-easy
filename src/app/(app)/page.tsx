@@ -18,6 +18,7 @@ import { getCustomers } from '@/lib/actions'
 import { authOptions } from '@/lib/auth'
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/16/solid'
 import { getServerSession } from 'next-auth'
+import { DeleteCustomerDialog } from './components/delete-customer-dialog'
 import { DetailsDialog } from './components/details-dialog'
 import { NewCustomerDialog } from './components/new-customer-dialog'
 
@@ -45,10 +46,10 @@ export default async function Home({
   const userName = session?.user?.name || '访客'
 
   // 客户情况选项
-  const customerStatusOptions = ['新客户', '老客户', '重点客户', '流失客户']
+  const customerStatusOptions = ['进群', '已退群', '已圈上', '被拉黑', '封号失联', '重复', '返回']
 
   // 成交记录选项
-  const transactionStatusOptions = ['已成交', '未成交', '待跟进', '已取消']
+  const transactionStatusOptions = ['已成交', '未成交', '待跟进']
 
   // 根据一天中的时间选择问候语和表情符号
   const currentHour = new Date().getHours()
@@ -177,6 +178,7 @@ export default async function Home({
       <Table className="mt-4 [--gutter:--spacing(6)] lg:[--gutter:--spacing(10)]">
         <TableHead>
           <TableRow>
+            <TableHeader>操作</TableHeader>
             <TableHeader>客户名称</TableHeader>
             <TableHeader>手机号</TableHeader>
             <TableHeader>客户归属</TableHeader>
@@ -192,6 +194,9 @@ export default async function Home({
           {customers.map((customer) => (
             <TableRow key={customer.id}>
               <TableCell>
+                <DeleteCustomerDialog customerId={customer.id} phoneNumber={customer.phoneNumber || ''} />
+              </TableCell>
+              <TableCell>
                 <Strong>{customer.customerName}</Strong>
               </TableCell>
               <TableCell>{customer.phoneNumber}</TableCell>
@@ -202,6 +207,7 @@ export default async function Home({
                   customerId={customer.id}
                   options={customerStatusOptions}
                   color="lime"
+                  type="customerStatus"
                 />
               </TableCell>
               <TableCell>
@@ -210,10 +216,11 @@ export default async function Home({
                   customerId={customer.id}
                   options={transactionStatusOptions}
                   color="purple"
+                  type="transactionStatus"
                 />
               </TableCell>
               <TableCell>
-                <DetailsDialog userName={customer.phoneNumber || ''} userId={customer.id} />
+                <DetailsDialog userName={customer.phoneNumber || ''} customerId={customer.id} />
               </TableCell>
               <TableCell>
                 <EditableNotes initialValue={customer.notes} customerId={customer.id} />

@@ -24,10 +24,10 @@ export function NewCustomerDialog() {
   }
 
   // 客户情况选项
-  const customerStatusOptions = ['新客户', '老客户', '重点客户', '流失客户']
+  const customerStatusOptions = ['进群', '已退群', '已圈上', '被拉黑', '封号失联', '重复', '返回']
 
   // 成交记录选项
-  const transactionStatusOptions = ['已成交', '未成交', '待跟进', '已取消']
+  const transactionStatusOptions = ['已成交', '未成交', '待跟进']
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -41,7 +41,6 @@ export function NewCustomerDialog() {
       // 刷新页面数据以显示新记录
       router.refresh()
     } catch (error) {
-      console.error('Error creating record:', error)
       setError(error instanceof Error ? error.message : '创建记录失败')
     } finally {
       setIsSubmitting(false)
@@ -77,7 +76,7 @@ export function NewCustomerDialog() {
                 </Field>
                 <Field>
                   <Label>客户情况</Label>
-                  <Listbox name="customerStatus" defaultValue="新客户">
+                  <Listbox name="customerStatus" defaultValue="进群">
                     {customerStatusOptions.map((option) => (
                       <ListboxOption key={option} value={option}>
                         <ListboxLabel>{option}</ListboxLabel>

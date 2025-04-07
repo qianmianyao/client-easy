@@ -15,6 +15,16 @@ export default function Register() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [username, setUsername] = useState('')
+  const [showAdminKeyField, setShowAdminKeyField] = useState(false)
+  const ADMIN_KEY = 'xxt-admin0011889'
+
+  // 监听用户名变化
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setUsername(value)
+    setShowAdminKeyField(value === 'admin')
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -23,6 +33,19 @@ export default function Register() {
 
     try {
       const formData = new FormData(e.currentTarget)
+
+      // 检查是否为管理员注册
+      if (username === 'admin') {
+        const adminKey = formData.get('adminKey') as string
+        if (adminKey !== ADMIN_KEY) {
+          setError('管理员密钥不正确')
+          setLoading(false)
+          return
+        }
+        // 添加管理员角色标记
+        formData.append('isAdmin', 'true')
+      }
+
       const result = await registerUser(formData)
 
       if (result?.success) {
@@ -50,15 +73,31 @@ export default function Register() {
       {error && <div className="rounded-md bg-red-50 p-4 text-sm text-red-500">{error}</div>}
 
       <Field>
-        <Label>邮箱</Label>
+        <Label>
+          用户名 <Text>请注意，设置后无法更改</Text>
+        </Label>
+        <Input name="name" disabled={loading} required value={username} onChange={handleUsernameChange} />
+      </Field>
+
+      {showAdminKeyField && (
+        <Field>
+          <Label>
+            管理员密钥 <Text>请输入管理员密钥</Text>
+          </Label>
+          <Input name="adminKey" type="password" disabled={loading} required />
+        </Field>
+      )}
+
+      <Field>
+        <Label>
+          邮箱 <Text>请输入您的邮箱</Text>
+        </Label>
         <Input type="email" name="email" disabled={loading} required />
       </Field>
       <Field>
-        <Label>用户名</Label>
-        <Input name="name" disabled={loading} required />
-      </Field>
-      <Field>
-        <Label>密码</Label>
+        <Label>
+          密码 <Text>密码不能少于 6 位</Text>
+        </Label>
         <Input type="password" name="password" autoComplete="new-password" disabled={loading} required minLength={6} />
       </Field>
       <Button type="submit" className="w-full" disabled={loading}>
