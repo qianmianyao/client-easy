@@ -694,3 +694,378 @@ export async function deleteUser(userId: number) {
     throw new Error('删除用户失败: ' + (error instanceof Error ? error.message : String(error)))
   }
 }
+
+/**
+ * 创建新的客户归属
+ * @param formData 表单数据
+ * @returns 新的客户归属
+ */
+export async function createCustomerAffiliation(formData: FormData) {
+  // 获取当前登录用户信息
+  const session = await getServerSession(authOptions)
+  const username = session?.user?.name || '未知用户'
+
+  // 确保用户已经登录
+  if (!session?.user) {
+    throw new Error('请先登录后再创建客户归属')
+  }
+
+  // 从表单中提取数据
+  const name = formData.get('name') as string
+  const avatar = (formData.get('avatar') as string) || null
+  const link = (formData.get('link') as string) || null
+
+  // 验证必填字段
+  if (!name) {
+    throw new Error('归属名称是必填项')
+  }
+
+  try {
+    // 检查是否已存在同名归属
+    const existingAffiliation = await prisma.customerAffiliation.findUnique({
+      where: { name },
+    })
+
+    if (existingAffiliation) {
+      throw new Error('该归属名称已存在')
+    }
+
+    // 创建新客户归属
+    const newAffiliation = await prisma.customerAffiliation.create({
+      data: {
+        name,
+        avatar,
+        link,
+        submitUser: username,
+      },
+    })
+
+    return newAffiliation
+  } catch (error: unknown) {
+    throw new Error('创建客户归属失败: ' + (error instanceof Error ? error.message : String(error)))
+  }
+}
+
+/**
+ * 获取所有客户归属
+ * @returns 客户归属列表
+ */
+export async function getCustomerAffiliations() {
+  try {
+    // 获取当前登录用户信息
+    const session = await getServerSession(authOptions)
+    const username = session?.user?.name || '未知用户'
+    const userRole = session?.user?.role || 'guest'
+
+    // 构建查询条件：管理员可以查看所有归属，其他用户只能查看自己提交的归属
+    let whereCondition = {}
+    if (userRole !== 'admin') {
+      whereCondition = {
+        submitUser: username,
+      }
+    }
+
+    // 获取所有归属
+    const affiliations = await prisma.customerAffiliation.findMany({
+      where: whereCondition,
+      orderBy: {
+        name: 'asc',
+      },
+    })
+
+    return affiliations
+  } catch (error) {
+    console.error('获取客户归属失败:', error)
+    throw new Error('获取客户归属失败: ' + (error instanceof Error ? error.message : String(error)))
+  }
+}
+
+/**
+ * 更新客户的归属
+ * @param formData 表单数据
+ * @returns 更新后的客户信息
+ */
+export async function updateCustomerAffiliation(formData: FormData) {
+  const customerId = parseInt(formData.get('customerId') as string)
+
+  // 验证用户是否有权限操作该客户
+  const hasPermission = await hasPermissionForCustomer(customerId)
+  if (!hasPermission) {
+    throw new Error('没有权限更新此客户的归属')
+  }
+
+  const affiliation = formData.get('affiliation') as string
+
+  // 如果选择了归属（非空值），验证用户是否有权限使用该归属
+  if (affiliation) {
+    // 获取当前登录用户信息
+    const session = await getServerSession(authOptions)
+    const username = session?.user?.name || '未知用户'
+    const userRole = session?.user?.role || 'guest'
+
+    // 不是管理员，需要验证归属的所有权
+    if (userRole !== 'admin') {
+      const affiliationRecord = await prisma.customerAffiliation.findUnique({
+        where: { name: affiliation },
+        select: { submitUser: true },
+      })
+
+      // 如果归属记录存在，并且提交用户不是当前用户，则拒绝操作
+      if (affiliationRecord && affiliationRecord.submitUser !== username) {
+        throw new Error('无权使用此归属，只能使用您自己创建的归属')
+      }
+    }
+  }
+
+  try {
+    const updatedCustomer = await prisma.customer.update({
+      where: { id: customerId },
+      data: {
+        affiliation: affiliation,
+      },
+    })
+
+    return updatedCustomer
+  } catch (error) {
+    throw new Error('更新客户归属失败: ' + (error instanceof Error ? error.message : String(error)))
+  }
+}
+
+/**
+ * 获取按客户归属分组的客户统计数据
+ * @returns 每个归属的统计数据
+ */
+export async function getCustomerStatsByAffiliation() {
+  try {
+    // 获取当前登录用户信息
+    const session = await getServerSession(authOptions)
+    const username = session?.user?.name || '未知用户'
+    const userRole = session?.user?.role || 'guest'
+
+    // 构建查询条件：管理员可以查看所有数据，其他用户只能查看自己的数据
+    let whereCondition = {}
+    if (userRole !== 'admin' && userRole !== 'manager') {
+      whereCondition = {
+        submitUser: username,
+      }
+    }
+
+    // 获取所有客户归属
+    const affiliations = await prisma.customerAffiliation.findMany({
+      where: userRole !== 'admin' ? { submitUser: username } : {},
+      orderBy: {
+        name: 'asc',
+      },
+    })
+
+    // 获取所有客户
+    const customers = await prisma.customer.findMany({
+      where: whereCondition,
+      include: {
+        transactions: true,
+      },
+    })
+
+    // 获取所有交易明细
+    const transactions = await prisma.transactionDetail.findMany({
+      where: {
+        customer: {
+          ...whereCondition,
+        },
+      },
+    })
+
+    // 按归属分组数据
+    const statsByAffiliation = affiliations.map((affiliation) => {
+      // 该归属下的所有客户
+      const affiliationCustomers = customers.filter((customer) => customer.affiliation === affiliation.name)
+
+      // 该归属下的客户数量
+      const customerCount = affiliationCustomers.length
+
+      // 客户状态统计
+      const customerStatusCounts = {
+        total: customerCount,
+        进群: affiliationCustomers.filter((c) => c.customerStatus === '进群').length,
+        已退群: affiliationCustomers.filter((c) => c.customerStatus === '已退群').length,
+        已圈上: affiliationCustomers.filter((c) => c.customerStatus === '已圈上').length,
+        被拉黑: affiliationCustomers.filter((c) => c.customerStatus === '被拉黑').length,
+        封号失联: affiliationCustomers.filter((c) => c.customerStatus === '封号失联').length,
+        重复: affiliationCustomers.filter((c) => c.customerStatus === '重复').length,
+        返回: affiliationCustomers.filter((c) => c.customerStatus === '返回').length,
+      }
+
+      // 成交情况统计
+      const transactionStatusCounts = {
+        已成交: affiliationCustomers.filter((c) => c.transactionStatus === '已成交').length,
+        未成交: affiliationCustomers.filter((c) => c.transactionStatus === '未成交').length,
+        待跟进: affiliationCustomers.filter((c) => c.transactionStatus === '待跟进').length,
+      }
+
+      // 该归属下客户的所有交易
+      const affiliationTransactions = transactions.filter((t) =>
+        affiliationCustomers.some((c) => c.id === t.customerId)
+      )
+
+      // 计算成交总额
+      const totalTransactionAmount = affiliationTransactions.reduce((sum, t) => sum + t.totalAmount, 0)
+
+      // 计算百分比
+      const calculatePercentage = (value: number, total: number) => {
+        if (total === 0) return 0
+        return parseFloat(((value / total) * 100).toFixed(2))
+      }
+
+      return {
+        name: affiliation.name,
+        avatar: affiliation.avatar,
+        link: affiliation.link,
+        submitUser: affiliation.submitUser,
+        customers: {
+          count: customerCount,
+          进群: {
+            count: customerStatusCounts.进群,
+            percentage: calculatePercentage(customerStatusCounts.进群, customerCount),
+          },
+          已退群: {
+            count: customerStatusCounts.已退群,
+            percentage: calculatePercentage(customerStatusCounts.已退群, customerCount),
+          },
+          已圈上: {
+            count: customerStatusCounts.已圈上,
+            percentage: calculatePercentage(customerStatusCounts.已圈上, customerCount),
+          },
+          被拉黑: {
+            count: customerStatusCounts.被拉黑,
+            percentage: calculatePercentage(customerStatusCounts.被拉黑, customerCount),
+          },
+          封号失联: {
+            count: customerStatusCounts.封号失联,
+            percentage: calculatePercentage(customerStatusCounts.封号失联, customerCount),
+          },
+          重复: {
+            count: customerStatusCounts.重复,
+            percentage: calculatePercentage(customerStatusCounts.重复, customerCount),
+          },
+          返回: {
+            count: customerStatusCounts.返回,
+            percentage: calculatePercentage(customerStatusCounts.返回, customerCount),
+          },
+        },
+        transactions: {
+          已成交: {
+            count: transactionStatusCounts.已成交,
+            percentage: calculatePercentage(transactionStatusCounts.已成交, customerCount),
+          },
+          未成交: {
+            count: transactionStatusCounts.未成交,
+            percentage: calculatePercentage(transactionStatusCounts.未成交, customerCount),
+          },
+          待跟进: {
+            count: transactionStatusCounts.待跟进,
+            percentage: calculatePercentage(transactionStatusCounts.待跟进, customerCount),
+          },
+          totalAmount: totalTransactionAmount,
+        },
+      }
+    })
+
+    // 添加"无归属"的统计数据
+    const noAffiliationCustomers = customers.filter((customer) => !customer.affiliation || customer.affiliation === '')
+
+    const noAffiliationCount = noAffiliationCustomers.length
+
+    if (noAffiliationCount > 0) {
+      // 客户状态统计
+      const customerStatusCounts = {
+        total: noAffiliationCount,
+        进群: noAffiliationCustomers.filter((c) => c.customerStatus === '进群').length,
+        已退群: noAffiliationCustomers.filter((c) => c.customerStatus === '已退群').length,
+        已圈上: noAffiliationCustomers.filter((c) => c.customerStatus === '已圈上').length,
+        被拉黑: noAffiliationCustomers.filter((c) => c.customerStatus === '被拉黑').length,
+        封号失联: noAffiliationCustomers.filter((c) => c.customerStatus === '封号失联').length,
+        重复: noAffiliationCustomers.filter((c) => c.customerStatus === '重复').length,
+        返回: noAffiliationCustomers.filter((c) => c.customerStatus === '返回').length,
+      }
+
+      // 成交情况统计
+      const transactionStatusCounts = {
+        已成交: noAffiliationCustomers.filter((c) => c.transactionStatus === '已成交').length,
+        未成交: noAffiliationCustomers.filter((c) => c.transactionStatus === '未成交').length,
+        待跟进: noAffiliationCustomers.filter((c) => c.transactionStatus === '待跟进').length,
+      }
+
+      // 无归属客户的所有交易
+      const noAffiliationTransactions = transactions.filter((t) =>
+        noAffiliationCustomers.some((c) => c.id === t.customerId)
+      )
+
+      // 计算成交总额
+      const totalTransactionAmount = noAffiliationTransactions.reduce((sum, t) => sum + t.totalAmount, 0)
+
+      // 计算百分比
+      const calculatePercentage = (value: number, total: number) => {
+        if (total === 0) return 0
+        return parseFloat(((value / total) * 100).toFixed(2))
+      }
+
+      statsByAffiliation.push({
+        name: '无归属',
+        avatar: null,
+        link: null,
+        submitUser: '系统',
+        customers: {
+          count: noAffiliationCount,
+          进群: {
+            count: customerStatusCounts.进群,
+            percentage: calculatePercentage(customerStatusCounts.进群, noAffiliationCount),
+          },
+          已退群: {
+            count: customerStatusCounts.已退群,
+            percentage: calculatePercentage(customerStatusCounts.已退群, noAffiliationCount),
+          },
+          已圈上: {
+            count: customerStatusCounts.已圈上,
+            percentage: calculatePercentage(customerStatusCounts.已圈上, noAffiliationCount),
+          },
+          被拉黑: {
+            count: customerStatusCounts.被拉黑,
+            percentage: calculatePercentage(customerStatusCounts.被拉黑, noAffiliationCount),
+          },
+          封号失联: {
+            count: customerStatusCounts.封号失联,
+            percentage: calculatePercentage(customerStatusCounts.封号失联, noAffiliationCount),
+          },
+          重复: {
+            count: customerStatusCounts.重复,
+            percentage: calculatePercentage(customerStatusCounts.重复, noAffiliationCount),
+          },
+          返回: {
+            count: customerStatusCounts.返回,
+            percentage: calculatePercentage(customerStatusCounts.返回, noAffiliationCount),
+          },
+        },
+        transactions: {
+          已成交: {
+            count: transactionStatusCounts.已成交,
+            percentage: calculatePercentage(transactionStatusCounts.已成交, noAffiliationCount),
+          },
+          未成交: {
+            count: transactionStatusCounts.未成交,
+            percentage: calculatePercentage(transactionStatusCounts.未成交, noAffiliationCount),
+          },
+          待跟进: {
+            count: transactionStatusCounts.待跟进,
+            percentage: calculatePercentage(transactionStatusCounts.待跟进, noAffiliationCount),
+          },
+          totalAmount: totalTransactionAmount,
+        },
+      })
+    }
+
+    return statsByAffiliation
+  } catch (error) {
+    console.error('获取客户归属统计数据失败:', error)
+    throw new Error('获取客户归属统计数据失败: ' + (error instanceof Error ? error.message : String(error)))
+  }
+}

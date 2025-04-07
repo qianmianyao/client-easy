@@ -14,12 +14,15 @@ import {
 } from '@/components/pagination'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/table'
 import { Strong } from '@/components/text'
-import { getCustomers } from '@/lib/actions'
+import { getCustomerAffiliations, getCustomers } from '@/lib/actions'
 import { authOptions } from '@/lib/auth'
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/16/solid'
 import { getServerSession } from 'next-auth'
+import { AffiliationDialog } from './components/affiliation-dialog'
 import { DeleteCustomerDialog } from './components/delete-customer-dialog'
 import { DetailsDialog } from './components/details-dialog'
+import { ExportCustomersButton } from './components/export-customers-button'
+import { NewAffiliationDialog } from './components/new-affiliation-dialog'
 import { NewCustomerDialog } from './components/new-customer-dialog'
 
 export default async function Home({
@@ -41,6 +44,9 @@ export default async function Home({
 
   // 获取客户数据和分页信息
   const { customers, totalPages } = await getCustomers(searchQuery, currentPage, itemsPerPage)
+
+  // 获取客户归属数据
+  const affiliations = await getCustomerAffiliations()
 
   const session = await getServerSession(authOptions)
   const userName = session?.user?.name || '访客'
@@ -173,7 +179,11 @@ export default async function Home({
             </InputGroup>
           </form>
         </div>
-        <NewCustomerDialog />
+        <div className="flex items-center space-x-2">
+          <ExportCustomersButton searchQuery={searchQuery} />
+          <NewAffiliationDialog />
+          <NewCustomerDialog />
+        </div>
       </div>
       <Table className="mt-4 [--gutter:--spacing(6)] lg:[--gutter:--spacing(10)]">
         <TableHead>
@@ -200,7 +210,13 @@ export default async function Home({
                 <Strong>{customer.customerName}</Strong>
               </TableCell>
               <TableCell>{customer.phoneNumber}</TableCell>
-              <TableCell>{customer.affiliation}</TableCell>
+              <TableCell>
+                <AffiliationDialog
+                  phoneNumber={customer.phoneNumber || ''}
+                  customerId={customer.id}
+                  initialAffiliation={customer.affiliation}
+                />
+              </TableCell>
               <TableCell>
                 <EditableStatus
                   initialValue={customer.customerStatus}

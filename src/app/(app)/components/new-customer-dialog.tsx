@@ -6,15 +6,24 @@ import { Field, Label } from '@/components/fieldset'
 import { Input } from '@/components/input'
 import { Listbox, ListboxLabel, ListboxOption } from '@/components/listbox'
 import { Textarea } from '@/components/textarea'
-import { createCustomer } from '@/lib/actions'
+import { createCustomer, getCustomerAffiliations } from '@/lib/actions'
 import { PlusIcon } from '@heroicons/react/16/solid'
 import { useRouter } from 'next/navigation'
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
+
+interface CustomerAffiliation {
+  id: number
+  name: string
+  avatar?: string | null
+  link?: string | null
+}
 
 export function NewCustomerDialog() {
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [affiliations, setAffiliations] = useState<CustomerAffiliation[]>([])
+  const [isLoadingAffiliations, setIsLoadingAffiliations] = useState(false)
   const router = useRouter()
 
   // 关闭对话框并重置状态
@@ -22,6 +31,26 @@ export function NewCustomerDialog() {
     setIsOpen(false)
     setError('')
   }
+
+  // 获取客户归属数据
+  const fetchAffiliations = async () => {
+    if (isOpen && affiliations.length === 0 && !isLoadingAffiliations) {
+      setIsLoadingAffiliations(true)
+      try {
+        const data = await getCustomerAffiliations()
+        setAffiliations(data)
+      } catch (err) {
+        console.error('获取客户归属失败:', err)
+      } finally {
+        setIsLoadingAffiliations(false)
+      }
+    }
+  }
+
+  // 当对话框打开时获取归属数据
+  useEffect(() => {
+    fetchAffiliations()
+  }, [isOpen])
 
   // 客户情况选项
   const customerStatusOptions = ['进群', '已退群', '已圈上', '被拉黑', '封号失联', '重复', '返回']
@@ -51,7 +80,7 @@ export function NewCustomerDialog() {
     <>
       <Button type="button" onClick={() => setIsOpen(true)}>
         <PlusIcon />
-        添加
+        添加客户
       </Button>
       <Dialog open={isOpen} onClose={handleClose}>
         <form onSubmit={handleSubmit}>
@@ -72,7 +101,22 @@ export function NewCustomerDialog() {
                 </Field>
                 <Field>
                   <Label>客户归属</Label>
-                  <Input name="affiliation" placeholder="输入客户归属" />
+                  <Listbox name="affiliation" defaultValue="">
+                    <ListboxOption value="">
+                      <ListboxLabel>选择归属</ListboxLabel>
+                    </ListboxOption>
+                    {isLoadingAffiliations ? (
+                      <ListboxOption value="loading" disabled>
+                        <ListboxLabel>加载中...</ListboxLabel>
+                      </ListboxOption>
+                    ) : (
+                      affiliations.map((affiliation) => (
+                        <ListboxOption key={affiliation.id} value={affiliation.name}>
+                          <ListboxLabel>{affiliation.name}</ListboxLabel>
+                        </ListboxOption>
+                      ))
+                    )}
+                  </Listbox>
                 </Field>
                 <Field>
                   <Label>客户情况</Label>
@@ -96,7 +140,7 @@ export function NewCustomerDialog() {
                 </Field>
                 <Field>
                   <Label>备注</Label>
-                  <Textarea name="description" placeholder="添加备注信息" />
+                  <Textarea name="notes" placeholder="添加备注信息" />
                 </Field>
               </div>
             </div>

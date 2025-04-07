@@ -56,6 +56,17 @@ model User {
   @@map("users")
 }
 
+// 客户归属
+model CustomerAffiliation {
+  id             Int     @id @default(autoincrement())
+  name           String  @unique
+  avatar         String?
+  link           String? @unique
+  submitUser     String?
+
+  @@map("customer_affiliations")
+}
+
 model Setting {
   id    Int    @id @default(autoincrement())
   key   String @unique
