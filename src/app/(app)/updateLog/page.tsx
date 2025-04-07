@@ -17,9 +17,9 @@ interface UpdateEntry {
 // 更新日志数据
 const updateHistory: UpdateEntry[] = [
   {
-    version: '1.2.0',
-    date: '2024-04-05',
-    title: '客户管理增强',
+    version: '1.0.0',
+    date: '2024-04-07',
+    title: '测试版本上线',
     description: '这次更新强化了客户管理功能，新增了批量导入导出和高级筛选功能。',
     changes: [
       { type: 'feature', content: '新增客户批量导入功能，支持Excel格式' },
@@ -27,27 +27,6 @@ const updateHistory: UpdateEntry[] = [
       { type: 'improvement', content: '改进了客户列表的加载速度，提升了50%' },
       { type: 'improvement', content: '优化了客户标签系统，增加了多标签筛选' },
       { type: 'fix', content: '修复了某些情况下客户地址无法保存的问题' },
-    ],
-  },
-  {
-    version: '1.1.0',
-    date: '2024-03-15',
-    title: '数据分析功能上线',
-    description: '新增了数据分析模块，帮助您更好地理解业务表现。',
-    changes: [
-      { type: 'feature', content: '新增销售趋势分析图表' },
-      { type: 'feature', content: '新增客户转化漏斗分析' },
-      { type: 'feature', content: '新增地区销售热力图' },
-      { type: 'improvement', content: '改进了报表导出功能，支持更多格式' },
-      { type: 'security', content: '增强了数据传输的加密措施' },
-    ],
-  },
-  {
-    version: '1.0.0',
-    date: '2024-02-20',
-    title: '正式版发布',
-    description: '我们很高兴地宣布客户管理系统正式版上线！',
-    changes: [
       { type: 'feature', content: '基础客户管理功能' },
       { type: 'feature', content: '订单跟踪系统' },
       { type: 'feature', content: '用户权限管理' },

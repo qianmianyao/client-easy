@@ -109,7 +109,7 @@ export function AffiliationDialog({
             <div className="rounded-md bg-red-50 p-4 text-sm text-red-700">{error}</div>
           ) : affiliations.length === 0 ? (
             <div className="rounded-md bg-amber-50 p-4 text-sm text-amber-700">
-              <p>您尚未创建任何客户归属，请点击"添加归属"按钮来创建新的归属</p>
+              <p>您尚未创建任何客户归属，请点击添加归属按钮来创建新的归属</p>
             </div>
           ) : (
             <>

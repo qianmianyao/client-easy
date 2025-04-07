@@ -93,9 +93,7 @@ export default function Settings() {
             <Text>您在系统中的角色</Text>
           </div>
           <div>
-            <div className="flex h-10 items-center rounded-md border border-zinc-200 bg-zinc-50 px-3 text-zinc-700">
-              {roleLabel}
-            </div>
+            <Input disabled value={roleLabel} />
           </div>
         </section>
 
@@ -107,9 +105,7 @@ export default function Settings() {
             <Text>您的登录用户名</Text>
           </div>
           <div>
-            <div className="flex h-10 items-center rounded-md border border-zinc-200 bg-zinc-50 px-3 text-zinc-700">
-              {session?.user?.name || ''}
-            </div>
+            <Input disabled value={session?.user?.name || ''} />
           </div>
         </section>
 
@@ -121,9 +117,7 @@ export default function Settings() {
             <Text>您的登录邮箱</Text>
           </div>
           <div>
-            <div className="flex h-10 items-center rounded-md border border-zinc-200 bg-zinc-50 px-3 text-zinc-700">
-              {session?.user?.email || ''}
-            </div>
+            <Input disabled value={session?.user?.email || ''} />
           </div>
         </section>
       </div>

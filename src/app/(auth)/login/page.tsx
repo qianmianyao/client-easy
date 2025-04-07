@@ -10,9 +10,10 @@ import { Strong, Text, TextLink } from '@/components/text'
 import { signIn } from 'next-auth/react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 
-export default function Login() {
+// Component that uses search params
+function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || '/'
@@ -104,10 +105,11 @@ export default function Login() {
         setLoading(false)
         return
       }
-
       // 登录成功，手动重定向到指定页面
       console.log('登录成功，重定向到:', callbackUrl)
-      router.push(callbackUrl)
+
+      // 使用window.location进行硬重定向，而不是router.push
+      window.location.href = callbackUrl
     } catch (err) {
       console.error('登录过程中发生异常:', err)
       setError('登录时发生错误，请稍后再试')
@@ -168,5 +170,13 @@ export default function Login() {
         </TextLink>
       </Text>
     </form>
+  )
+}
+
+export default function Login() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LoginForm />
+    </Suspense>
   )
 }

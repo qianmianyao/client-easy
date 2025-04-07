@@ -37,7 +37,6 @@ export const authOptions: AuthOptions = {
 
           // 更新最后登录时间
           const currentTime = Date.now()
-          console.log(`准备更新用户(ID:${user.id})的最后登录时间为: ${currentTime}`)
 
           try {
             const updatedUser = await prisma.user.update({
@@ -50,10 +49,8 @@ export const authOptions: AuthOptions = {
                 lastLogin: true,
               },
             })
-            console.log('更新成功，用户最后登录时间:', updatedUser.lastLogin)
           } catch (updateError) {
             console.error('更新最后登录时间失败:', updateError)
-            // 即使更新失败，仍然允许用户登录
           }
 
           return {

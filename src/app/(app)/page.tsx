@@ -1,9 +1,7 @@
-import { Stat } from '@/app/stat'
 import { EditableNotes } from '@/components/editable-notes'
 import { EditableStatus } from '@/components/editable-status'
-import { Heading, Subheading } from '@/components/heading'
+import { Heading } from '@/components/heading'
 import { Input, InputGroup } from '@/components/input'
-import { Listbox, ListboxLabel, ListboxOption } from '@/components/listbox'
 import {
   Pagination,
   PaginationGap,
@@ -14,11 +12,12 @@ import {
 } from '@/components/pagination'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/table'
 import { Strong } from '@/components/text'
-import { getCustomerAffiliations, getCustomers } from '@/lib/actions'
+import { getCustomers, getDashboardStats } from '@/lib/actions'
 import { authOptions } from '@/lib/auth'
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/16/solid'
 import { getServerSession } from 'next-auth'
 import { AffiliationDialog } from './components/affiliation-dialog'
+import { DashboardStatsWrapper } from './components/dashboard-stats'
 import { DeleteCustomerDialog } from './components/delete-customer-dialog'
 import { DetailsDialog } from './components/details-dialog'
 import { ExportCustomersButton } from './components/export-customers-button'
@@ -31,6 +30,7 @@ export default async function Home({
   searchParams: {
     search?: string
     page?: string
+    period?: string
   }
 }) {
   // 获取搜索查询
@@ -39,14 +39,17 @@ export default async function Home({
   // 获取当前页码，默认为1
   const currentPage = parseInt(searchParams.page || '1', 10)
 
+  // 获取选择的时间周期，默认为上周
+  const selectedPeriod = searchParams.period || 'last_week'
+
   // 每页显示的记录数
   const itemsPerPage = 10
 
   // 获取客户数据和分页信息
   const { customers, totalPages } = await getCustomers(searchQuery, currentPage, itemsPerPage)
 
-  // 获取客户归属数据
-  const affiliations = await getCustomerAffiliations()
+  // 获取仪表盘统计数据（初始数据）
+  const dashboardStats = await getDashboardStats(selectedPeriod)
 
   const session = await getServerSession(authOptions)
   const userName = session?.user?.name || '访客'
@@ -80,6 +83,12 @@ export default async function Home({
       params.set('search', searchQuery)
     }
     params.set('page', pageNum.toString())
+
+    // 保持周期选择
+    if (selectedPeriod) {
+      params.set('period', selectedPeriod)
+    }
+
     return `?${params.toString()}`
   }
 
@@ -140,30 +149,8 @@ export default async function Home({
       <Heading>
         {greeting}, {userName} {emoji}
       </Heading>
-      <div className="mt-8 flex items-end justify-between">
-        <Subheading>数据概览</Subheading>
-        <div>
-          <Listbox name="period" defaultValue="last_week">
-            <ListboxOption value="last_week">
-              <ListboxLabel>上周</ListboxLabel>
-            </ListboxOption>
-            <ListboxOption value="last_two">
-              <ListboxLabel>过去两周</ListboxLabel>
-            </ListboxOption>
-            <ListboxOption value="last_month">
-              <ListboxLabel>上个月</ListboxLabel>
-            </ListboxOption>
-            <ListboxOption value="last_quarter">
-              <ListboxLabel>上季度</ListboxLabel>
-            </ListboxOption>
-          </Listbox>
-        </div>
-      </div>
-      <div className="mt-4 grid gap-8 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat title="成交金额" value="$4550" change="+4.5%" />
-        <Stat title="平均订单价值" value="$455" change="-0.5%" />
-        <Stat title="成交数量" value="10" change="+4.5%" />
-        <Stat title="客户数量" value="10" change="+21.2%" />
+      <div className="mt-8">
+        <DashboardStatsWrapper initialPeriod={selectedPeriod} initialStats={dashboardStats} />
       </div>
       <div className="mt-14 flex items-center justify-between">
         <div className="w-72">

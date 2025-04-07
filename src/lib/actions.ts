@@ -115,7 +115,7 @@ export async function createCustomer(formData: FormData) {
   const customerName = formData.get('customerName') as string
   const phoneNumber = formData.get('phoneNumber') as string
   const affiliation = (formData.get('affiliation') as string) || ''
-  const customerStatus = (formData.get('customerStatus') as string) || '新客户'
+  const customerStatus = (formData.get('customerStatus') as string) || '进群'
   const transactionStatus = (formData.get('transactionStatus') as string) || '未成交'
   const notes = (formData.get('notes') as string) || ''
 
@@ -1380,5 +1380,218 @@ export async function checkForRecentTestData() {
   } catch (error) {
     console.error('检查最近数据失败:', error)
     throw new Error('检查最近数据失败: ' + (error instanceof Error ? error.message : String(error)))
+  }
+}
+
+/**
+ * 获取仪表盘统计数据
+ * @param period 时间周期（上周、过去两周、上个月、上季度）
+ * @returns 统计数据和同比变化
+ */
+export async function getDashboardStats(period: string = 'last_week') {
+  try {
+    // 获取当前登录用户信息
+    const session = await getServerSession(authOptions)
+    const username = session?.user?.name || '未知用户'
+    const userRole = session?.user?.role || 'guest'
+
+    // 设置时间范围
+    const now = new Date()
+    let startDate: Date
+    let endDatePeriod: Date
+    let previousStartDate: Date
+    let previousEndDate: Date
+
+    // 基于选择的周期设置日期范围
+    switch (period) {
+      case 'last_week': // 上周
+        // 上周的开始（上周一）和结束（上周日）
+        const dayOfWeek = now.getDay() || 7 // 将周日从0转为7
+        startDate = new Date(now)
+        startDate.setDate(now.getDate() - dayOfWeek - 6) // 上周一
+        startDate.setHours(0, 0, 0, 0)
+
+        endDatePeriod = new Date(startDate)
+        endDatePeriod.setDate(startDate.getDate() + 6) // 上周日
+        endDatePeriod.setHours(23, 59, 59, 999)
+
+        // 前一周的相同时间段
+        previousStartDate = new Date(startDate)
+        previousStartDate.setDate(previousStartDate.getDate() - 7)
+        previousEndDate = new Date(endDatePeriod)
+        previousEndDate.setDate(previousEndDate.getDate() - 7)
+        break
+
+      case 'last_two': // 过去两周
+        startDate = new Date(now)
+        startDate.setDate(now.getDate() - 14)
+        startDate.setHours(0, 0, 0, 0)
+
+        endDatePeriod = new Date() // 现在作为结束日期
+
+        // 前两周的相同时间段
+        previousStartDate = new Date(startDate)
+        previousStartDate.setDate(previousStartDate.getDate() - 14)
+        previousEndDate = new Date(now)
+        previousEndDate.setDate(previousEndDate.getDate() - 15)
+        previousEndDate.setHours(23, 59, 59, 999)
+        break
+
+      case 'last_month': // 上个月
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+        const lastDayOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0).getDate()
+        endDatePeriod = new Date(now.getFullYear(), now.getMonth() - 1, lastDayOfLastMonth, 23, 59, 59, 999)
+
+        // 前一个月的相同时间段
+        previousStartDate = new Date(now.getFullYear(), now.getMonth() - 2, 1)
+        previousEndDate = new Date(now.getFullYear(), now.getMonth() - 1, 0, 23, 59, 59, 999)
+        break
+
+      case 'last_quarter': // 上季度
+        const currentQuarter = Math.floor(now.getMonth() / 3)
+        const lastQuarterStartMonth = ((currentQuarter - 1 + 4) % 4) * 3 // 确保为正数
+
+        startDate = new Date(
+          now.getFullYear() - (lastQuarterStartMonth > now.getMonth() ? 1 : 0),
+          lastQuarterStartMonth,
+          1
+        )
+        endDatePeriod = new Date(startDate.getFullYear(), startDate.getMonth() + 3, 0, 23, 59, 59, 999)
+
+        // 前一季度的相同时间段
+        previousStartDate = new Date(startDate)
+        previousStartDate.setMonth(previousStartDate.getMonth() - 3)
+        previousEndDate = new Date(endDatePeriod)
+        previousEndDate.setMonth(previousEndDate.getMonth() - 3)
+        break
+
+      default: // 默认为上周
+        const defaultDayOfWeek = now.getDay() || 7
+        startDate = new Date(now)
+        startDate.setDate(now.getDate() - defaultDayOfWeek - 6)
+        startDate.setHours(0, 0, 0, 0)
+
+        endDatePeriod = new Date(startDate)
+        endDatePeriod.setDate(startDate.getDate() + 6)
+        endDatePeriod.setHours(23, 59, 59, 999)
+
+        previousStartDate = new Date(startDate)
+        previousStartDate.setDate(previousStartDate.getDate() - 7)
+        previousEndDate = new Date(endDatePeriod)
+        previousEndDate.setDate(previousEndDate.getDate() - 7)
+    }
+
+    // 构建查询条件
+    let whereCondition: any = {}
+
+    // 基于用户角色设置查询条件
+    if (userRole !== 'admin' && userRole !== 'manager') {
+      whereCondition.submitUser = username
+    }
+
+    // 当前时间段的交易
+    const currentTransactions = await prisma.transactionDetail.findMany({
+      where: {
+        transactionTime: {
+          gte: BigInt(startDate.getTime()),
+          lte: BigInt(endDatePeriod.getTime()),
+        },
+        customer: {
+          ...whereCondition,
+        },
+      },
+    })
+
+    // 前一时间段的交易
+    const previousTransactions = await prisma.transactionDetail.findMany({
+      where: {
+        transactionTime: {
+          gte: BigInt(previousStartDate.getTime()),
+          lte: BigInt(previousEndDate.getTime()),
+        },
+        customer: {
+          ...whereCondition,
+        },
+      },
+    })
+
+    // 当前时间段的客户
+    const currentCustomers = await prisma.customer.findMany({
+      where: {
+        ...whereCondition,
+        submitTime: {
+          gte: BigInt(startDate.getTime()),
+          lte: BigInt(endDatePeriod.getTime()),
+        },
+      },
+    })
+
+    // 前一时间段的客户
+    const previousCustomers = await prisma.customer.findMany({
+      where: {
+        ...whereCondition,
+        submitTime: {
+          gte: BigInt(previousStartDate.getTime()),
+          lte: BigInt(previousEndDate.getTime()),
+        },
+      },
+    })
+
+    // 计算统计数据
+    // 1. 成交金额
+    const currentTransactionAmount = currentTransactions.reduce((sum, t) => sum + t.totalAmount, 0)
+    const previousTransactionAmount = previousTransactions.reduce((sum, t) => sum + t.totalAmount, 0)
+    const transactionAmountChange =
+      previousTransactionAmount === 0
+        ? 100
+        : ((currentTransactionAmount - previousTransactionAmount) / previousTransactionAmount) * 100
+
+    // 2. 成交数量
+    const currentTransactionCount = currentTransactions.length
+    const previousTransactionCount = previousTransactions.length
+    const transactionCountChange =
+      previousTransactionCount === 0
+        ? 100
+        : ((currentTransactionCount - previousTransactionCount) / previousTransactionCount) * 100
+
+    // 3. 客户数量
+    const currentCustomerCount = currentCustomers.length
+    const previousCustomerCount = previousCustomers.length
+    const customerCountChange =
+      previousCustomerCount === 0 ? 100 : ((currentCustomerCount - previousCustomerCount) / previousCustomerCount) * 100
+
+    // 4. 平均订单价值
+    const currentAvgOrderValue = currentTransactionCount === 0 ? 0 : currentTransactionAmount / currentTransactionCount
+    const previousAvgOrderValue =
+      previousTransactionCount === 0 ? 0 : previousTransactionAmount / previousTransactionCount
+    const avgOrderValueChange =
+      previousAvgOrderValue === 0 ? 100 : ((currentAvgOrderValue - previousAvgOrderValue) / previousAvgOrderValue) * 100
+
+    return {
+      transactionAmount: {
+        value: currentTransactionAmount,
+        change: transactionAmountChange.toFixed(1),
+      },
+      avgOrderValue: {
+        value: currentAvgOrderValue,
+        change: avgOrderValueChange.toFixed(1),
+      },
+      transactionCount: {
+        value: currentTransactionCount,
+        change: transactionCountChange.toFixed(1),
+      },
+      customerCount: {
+        value: currentCustomerCount,
+        change: customerCountChange.toFixed(1),
+      },
+      periodInfo: {
+        startDate: startDate.toISOString(),
+        endDate: endDatePeriod.toISOString(),
+        period,
+      },
+    }
+  } catch (error) {
+    console.error('获取仪表盘统计数据失败:', error)
+    throw new Error('获取仪表盘统计数据失败: ' + (error instanceof Error ? error.message : String(error)))
   }
 }

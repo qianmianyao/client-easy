@@ -1,10 +1,11 @@
-import { Strong, Text, TextLink } from '@/components/text'
+import { Heading } from '@/components/heading'
+import { Text } from '@/components/text'
 
 export default async function Help() {
   return (
-    <Text>
-      This feature is only available to users on the <Strong>Business Plan</Strong>. To upgrade, visit your{' '}
-      <TextLink href="#">billing settings</TextLink>.
-    </Text>
+    <>
+      <Heading>帮助文档</Heading>
+      <Text>Empty page, haven figured out what to write about yet</Text>
+    </>
   )
 }
