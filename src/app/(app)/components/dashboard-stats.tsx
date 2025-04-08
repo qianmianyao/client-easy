@@ -30,7 +30,7 @@ type StatsData = {
 }
 
 function DashboardStats({ initialPeriod, initialStats }: { initialPeriod: string; initialStats: StatsData }) {
-  const [period, setPeriod] = useState(initialPeriod)
+  const [period, setPeriod] = useState(initialPeriod || 'current_week')
   const [stats, setStats] = useState<StatsData>(initialStats)
   const [isLoading, setIsLoading] = useState(false)
   const initialRender = useRef(true)
@@ -88,6 +88,9 @@ function DashboardStats({ initialPeriod, initialStats }: { initialPeriod: string
         <span className="text-2xl font-semibold">数据概览</span>
         <div>
           <Listbox name="period" value={period} onChange={handlePeriodChange}>
+            <ListboxOption value="current_week">
+              <ListboxLabel>本周</ListboxLabel>
+            </ListboxOption>
             <ListboxOption value="last_week">
               <ListboxLabel>上周</ListboxLabel>
             </ListboxOption>
@@ -138,7 +141,7 @@ export function DashboardStatsWrapper({
 }) {
   return (
     <Suspense fallback={<div>Loading...</div>}>
-      <DashboardStats initialPeriod={initialPeriod} initialStats={initialStats} />
+      <DashboardStats initialPeriod={initialPeriod || 'current_week'} initialStats={initialStats} />
     </Suspense>
   )
 }

@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'client-easy',
-      script: 'bun',
+      script: 'pnpm',
       args: 'start',
       instances: 1,
       autorestart: true,
@@ -20,7 +20,7 @@ module.exports = {
         PORT: 3000,
         NEXTAUTH_URL: 'http://localhost:3000',
         NEXTAUTH_SECRET: 'your-super-secret-key-for-client-easy-app-1234567890',
-        DATABASE_URL: 'file:prod.db',
+        DATABASE_URL: 'file:dev.db',
       },
     },
   ],

@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   try {
     // 获取URL参数
     const searchParams = request.nextUrl.searchParams
-    const period = searchParams.get('period') || 'last_week'
+    const period = searchParams.get('period') || 'current_week'
 
     // 获取统计数据
     const stats = await getDashboardStats(period)

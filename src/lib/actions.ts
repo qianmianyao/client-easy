@@ -1385,10 +1385,10 @@ export async function checkForRecentTestData() {
 
 /**
  * 获取仪表盘统计数据
- * @param period 时间周期（上周、过去两周、上个月、上季度）
+ * @param period 时间周期（本周、上周、过去两周、上个月、上季度）
  * @returns 统计数据和同比变化
  */
-export async function getDashboardStats(period: string = 'last_week') {
+export async function getDashboardStats(period: string = 'current_week') {
   try {
     // 获取当前登录用户信息
     const session = await getServerSession(authOptions)
@@ -1404,6 +1404,22 @@ export async function getDashboardStats(period: string = 'last_week') {
 
     // 基于选择的周期设置日期范围
     switch (period) {
+      case 'current_week': // 本周
+        // 本周的开始（本周一）和结束（当前时间）
+        const currentDayOfWeek = now.getDay() || 7 // 将周日从0转为7
+        startDate = new Date(now)
+        startDate.setDate(now.getDate() - currentDayOfWeek + 1) // 本周一
+        startDate.setHours(0, 0, 0, 0)
+
+        endDatePeriod = new Date() // 当前时间作为结束
+
+        // 前一周的相同时间段
+        previousStartDate = new Date(startDate)
+        previousStartDate.setDate(previousStartDate.getDate() - 7)
+        previousEndDate = new Date(endDatePeriod)
+        previousEndDate.setDate(previousEndDate.getDate() - 7)
+        break
+
       case 'last_week': // 上周
         // 上周的开始（上周一）和结束（上周日）
         const dayOfWeek = now.getDay() || 7 // 将周日从0转为7
@@ -1465,15 +1481,13 @@ export async function getDashboardStats(period: string = 'last_week') {
         previousEndDate.setMonth(previousEndDate.getMonth() - 3)
         break
 
-      default: // 默认为上周
+      default: // 默认为本周
         const defaultDayOfWeek = now.getDay() || 7
         startDate = new Date(now)
-        startDate.setDate(now.getDate() - defaultDayOfWeek - 6)
+        startDate.setDate(now.getDate() - defaultDayOfWeek + 1) // 本周一
         startDate.setHours(0, 0, 0, 0)
 
-        endDatePeriod = new Date(startDate)
-        endDatePeriod.setDate(startDate.getDate() + 6)
-        endDatePeriod.setHours(23, 59, 59, 999)
+        endDatePeriod = new Date() // 当前时间作为结束
 
         previousStartDate = new Date(startDate)
         previousStartDate.setDate(previousStartDate.getDate() - 7)

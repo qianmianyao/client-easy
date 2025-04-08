@@ -39,8 +39,8 @@ export default async function Home({
   // 获取当前页码，默认为1
   const currentPage = parseInt(searchParams.page || '1', 10)
 
-  // 获取选择的时间周期，默认为上周
-  const selectedPeriod = searchParams.period || 'last_week'
+  // 获取选择的时间周期，默认为本周
+  const selectedPeriod = searchParams.period || 'current_week'
 
   // 每页显示的记录数
   const itemsPerPage = 10
