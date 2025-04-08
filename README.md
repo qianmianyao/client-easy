@@ -1,15 +1,21 @@
-# Catalyst Demo
+# ClientEasy
 
-To run the Catalyst demo, first install the npm dependencies:
+## deploy
 
-```bash
-npm install
-```
-
-Next, run the development server:
+install bun
 
 ```bash
-npm run dev
+curl -fsSL https://bun.sh/install | bash
 ```
 
-Finally, open [http://localhost:3000](http://localhost:3000) in your browser to view the website.
+Install pm2 globally with bun:
+
+```bash
+bun install -g pm2
+```
+
+```bash
+bun install --production
+bun prisma generate
+pm2 start ecosystem.config.js --env production
+```
